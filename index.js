@@ -11,7 +11,7 @@ const GoogleStrategy = require('passport-google-oauth20');
 // Google will respond with a key we can use to retrieve profile
 // information, packed into a redirect response that redirects to
 // server162.site:[port]/auth/redirect
-const hiddenClientID = process.env['ClientID']
+const hiddenClientID = process.env['clientID']
 const hiddenClientSecret = process.env['ClientSecret']
 
 
@@ -33,9 +33,6 @@ const googleLoginData = {
 // It will get used much later in the pipeline. 
 passport.use(new GoogleStrategy(googleLoginData, gotProfile));
 
-
-// Let's build a server pipeline!
-
 // app is the object that implements the express server
 const app = express();
 
@@ -43,14 +40,6 @@ const dbo = require('./databaseOps');
 app.use(express.json());
 
 app.use(express.static('public'))
-
-/* hugo commented out as specific post functions below
-app.post('*', isAuthenticated, function(request, response, next) {
-  console.log("Server recieved a post request at", request.url);
-  console.log("body", request.body);
-  response.send("I got your POST request");
-});
-*/
 
 // pipeline stage that just echos url, for debugging
 app.use('/', printURL);
@@ -81,38 +70,23 @@ app.get('/*', express.static('public'));
 
 // next, handler for url that starts login with Google.
 // The app (in public/login.html) redirects to here 
-// (it's a new page, not an AJAX request!)
-// Kicks off login process by telling Browser to redirect to
-// Google. The object { scope: ['profile'] } says to ask Google
-// for their user profile information.
 app.get('/auth/google',
   passport.authenticate('google', { scope: ['profile'] }));
-// passport.authenticate sends off the 302 (redirect) response
-// with fancy redirect URL containing request for profile, and
-// client ID string to identify this app. 
-// The redirect response goes to the browser, as usual, but the browser sends it to Google.  
-// Google puts up the login page! 
 
 // Google redirects here after user successfully logs in
-// This route has three middleware functions. It runs them one after another.
 app.get('/auth/accepted',
   // for educational purposes
   function(req, res, next) {
     console.log("at auth/accepted");
     next();
   },
-  // This will issue Server's own HTTPS request to Google
-  // to access the user's profile information with the 
-  // temporary key we got in the request. 
+
   passport.authenticate('google'),
-  // then it will run the "gotProfile" callback function,
-  // set up the cookie, call serialize, whose "done" 
-  // will come back here to send back the response
-  // ...with a cookie in it for the Browser! 
+  
+
   function(req, res) {
     console.log('Logged in and using cookies!')
     // tell browser to get the hidden main page of the app
-    //res.redirect('/hello.html');
     res.redirect('/index.html');
   });
 
@@ -130,21 +104,19 @@ app.get('/*',
   express.static('user')
 );
 
-// hugo this query we do not need
-// next, put all queries (like store or reminder ... notice the isAuthenticated 
-// middleware function; queries are only handled if the user is logged in
+
 app.get('/query', isAuthenticated,
   function(req, res) {
     console.log("saw query");
     res.send('HTTP query!')
   });
 
-// hugo added from fitness 2
+
 app.post('/store', isAuthenticated, function(request, response, next) {
   var newEntry = request.body;
 	let userId = request.user.id;
 	console.log(userId);
-  //console.log("newEntry", newEntry);
+
   dbo.insertActivity(userId,newEntry).catch(
     function(error) {
       console.log("error inserting entry:", error);
@@ -169,9 +141,9 @@ app.get('/week', isAuthenticated, function(request, response, next) {
     );
 });
 
-//Abdullah added for part 8
-app.get('/name', isAuthenticated, function(req, res) { //need to test 
-  let userId = req.user.id; //double check  req.user.name
+
+app.get('/name', isAuthenticated, function(req, res) { 
+  let userId = req.user.id; 
 
   dbo.userSearch(userId).then ((val) => {
       console.log("val is: ", val);
@@ -224,7 +196,7 @@ app.get('/dump2', isAuthenticated, function(request, response, next) {
 // finally, file not found, if we cannot handle otherwise.
 app.use(fileNotFound);
 
-// Pipeline is ready. Start listening!  
+//start pipeline
 const listener = app.listen(3000, () => {
   console.log("The static server is listening on port " + listener.address().port);
 });
@@ -261,21 +233,11 @@ function isAuthenticated(req, res, next) {
   }
 }
 
-
-// Some functions Passport calls, that we can use to specialize.
-// This is where we get to write our own code, not just boilerplate. 
-// The callback "done" at the end of each one resumes Passport's
-// internal process.  It is kind of like "next" for Express. 
-
 // function called during login, the second time passport.authenticate
 // is called (in /auth/redirect/),
 // once we actually have the profile data from Google. 
 function gotProfile(accessToken, refreshToken, profile, done) {
   console.log("Google profile has arrived", profile);
-  // here is a good place to check if user is in DB,
-  // and to store him in DB if not already there. 
-  // Second arg to "done" will be passed into serializeUser,
-  // should be key to get user out of database.
 
   let userid = profile.id;
   let name = profile.name.givenName;
@@ -290,25 +252,16 @@ function gotProfile(accessToken, refreshToken, profile, done) {
 } 
 
 // Part of Server's sesssion set-up.  
-// The second operand of "done" becomes the input to deserializeUser
-// on every subsequent HTTP request with this session's cookie. 
 passport.serializeUser((userid, done) => {
   console.log("SerializeUser. Input is", userid);
   done(null, userid);
 });
 
-// Called by passport.session pipeline stage on every HTTP request with
-// a current session cookie. 
 // Where we should lookup user database info. 
-// Whatever we pass in the "done" callback becomes req.user
-// and can be used by subsequent middleware.
 passport.deserializeUser((userid, done) => {
   console.log("deserializeUser. Input is:", userid);
-  // here is a good place to look up user data in database using
-  // dbRowID. Put whatever you want into an object. It ends up
-  // as the property "user" of the "req" object. 
   let userData = { id:userid, name: "data from user's db row goes here" };
-  //let userData = { userData: "data from user's db row goes here" };
+
   
     dbo.userSearch(userid).then ((val) => {
         userData = { id:userid, name:val };
@@ -321,11 +274,7 @@ passport.deserializeUser((userid, done) => {
         }
     );
 
-    //userData = { id:userid, name:name }; //just commented
-  
-  //let userData = { id:userid, name:name };
-  //done(null, userData); just commented 
 });
 
 
-const mySecret = process.env['ClientID']
+const mySecret = process.env['clientID']

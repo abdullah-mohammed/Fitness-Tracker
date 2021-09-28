@@ -1,8 +1,7 @@
 
-'use strict';  // always start with this 
+'use strict';  
 
-//abdullah just added
-initializeName(); // maybe remove
+initializeName(); 
 
 import barchart from './barchart.js'
 
@@ -55,11 +54,11 @@ window.addEventListener('load', (event) => {
 var reminderAct;
 var reminderDate = newUTCDate();
 
-//abdullah just added not sure if working 
+
 async function getNameString() {
   let response = await fetch('/name');
   if (response.ok){
-    return response.text(); //name as string 
+    return response.text(); 
   } else {
     console.log(error);
   }
